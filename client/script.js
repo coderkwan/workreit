@@ -7,8 +7,9 @@ let main_interval
 let current_id
 
 async function getData() {
-    const res = await fetch("http://localhost:3001/", {method: "GET"})
+    const res = await fetch("http://localhost:3001/", {method: "GET", credentials: "include"})
     if (res.ok) {
+        content.style.display = 'block'
         const body = await res.json()
         const items = body.data.reverse()
         data_container.innerHTML = ''
@@ -16,9 +17,10 @@ async function getData() {
             data_container.appendChild(createTaskElement(item))
         })
     } else {
-        console.log("cant find content")
+        window.location.replace("/login")
     }
 }
+
 getData()
 
 form.addEventListener("submit", (e) => createTask(e))
@@ -96,6 +98,17 @@ async function stopTask(id) {
     getData();
 }
 
+
+logout_btn.addEventListener("click", () => logout())
+
+async function logout() {
+    const res = await fetch("http://localhost:3001/logout", {method: "GET", credentials: "include"})
+    if (res.ok) {
+        window.location.replace("/login")
+    } else {
+        console.log("Can't logout!")
+    }
+}
 
 
 function createTaskElement(data) {
