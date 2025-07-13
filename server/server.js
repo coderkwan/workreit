@@ -25,14 +25,12 @@ server.get("/", async (req, res) => {
 
 server.post("/create", async (req, res) => {
     const data = req.body
-
+    //___________________ Sanitize data
     try {
         const query = await turso.execute(
             `INSERT INTO tracker (task, start_time) VALUES ('${data.task}', '${data.start_time}');`
         );
-        console.log(query)
         if (query.rowsAffected == 1) {
-
             res.status(200).send({message: "Task created Succesfully!", id: Number(query.lastInsertRowid)})
         } else {
             throw new Error("Failed to create a task!")
@@ -41,6 +39,40 @@ server.post("/create", async (req, res) => {
     } catch (e) {
         res.status(401).send({message: e.message})
     }
+})
+
+server.put("/stop", async (req, res) => {
+    const data = req.body
+    //___________________ Sanitize data
+    try {
+        const query = await turso.execute(`UPDATE tracker SET end_time='${data.end_time}' WHERE id='${data.id}';`)
+        console.log(query)
+        if (query.rowsAffected == 1) {
+            res.status(200).send({message: "Task saved Succesfully!", id: Number(query.lastInsertRowid)})
+        } else {
+            throw new Error("Failed to save a task!")
+        }
+    } catch (e) {
+        res.status(401).send({message: e.message})
+    }
+})
+
+server.delete("/delete", async (req, res) => {
+    const data = req.body
+
+    try {
+        const query = await turso.execute(`DELETE FROM tracker WHERE id='${data.id}';`)
+        if (query.rowsAffected == 1) {
+            res.status(200).send({message: "Task deleted Succesfully!"})
+        } else {
+            throw new Error("Failed to delete task")
+        }
+
+    } catch (e) {
+        res.status(401).send({message: e.message})
+    }
+
+
 })
 
 
