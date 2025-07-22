@@ -1,19 +1,14 @@
 
 async function checkAuth() {
-    const res = await fetch("http://localhost:3001/checkauth", {method: "GET", credentials: "include"})
+    const res = await fetch("http://localhost:3001/loggedin", {method: "GET", credentials: "include"})
 
-    let ans = await res.json()
     if (res.ok) {
-        console.log(ans.message)
-        console.log("logged in")
         window.location.replace("/")
-
     } else {
         content.style.display = 'block'
-        console.log(ans.message)
-        console.log("not registered")
     }
 }
+
 checkAuth()
 
 if (document.getElementById('register_form')) {

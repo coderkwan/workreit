@@ -16,8 +16,11 @@ async function getData() {
         items.forEach((item, index) => {
             data_container.appendChild(createTaskElement(item))
         })
-    } else {
+    } else if (res.status == 401) {
         window.location.replace("/login")
+    } else {
+        const body = await res.json()
+        console.log(body.message)
     }
 }
 
@@ -35,7 +38,7 @@ async function createTask(e) {
     const data = {task: name, start_time, tag: "", project: ""}
 
     if (!running) {
-        const res = await fetch("http://localhost:3001/create", {method: "POST", body: JSON.stringify(data), headers: {"Content-Type": "application/json"}})
+        const res = await fetch("http://localhost:3001/create", {method: "POST", credentials: "include", body: JSON.stringify(data), headers: {"Content-Type": "application/json"}})
 
         if (res.ok) {
             const done = await res.json()

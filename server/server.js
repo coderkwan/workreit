@@ -7,47 +7,55 @@ import jwt from "jsonwebtoken"
 import cookieParser from "cookie-parser"
 
 const server = express()
+
 server.use(cors({
-    origin: 'http://localhost:3000',  // <-- frontend origin
+    origin: 'http://localhost:3000',
     credentials: true
-}                 // <-- allow cookies, auth headers
-))
+}))
+
 server.use(express.json())
 server.use(cookieParser())
 
-server.get("/checkauth", async (req, res) => {
+function checkAuth(req, res, next) {
     const token = req.cookies.token
 
     if (!token) {
         res.status(401).send({message: "Cant auth, please login"})
-    }
-    res.send({message: "You are deep inside!"})
-})
-
-server.get("/", async (req, res) => {
-    const token = req.cookies.token
-
-    if (!token) {
-        res.status(401).send({message: "Cant auth, please login"})
+        return
     }
 
     try {
         jwt.decode(token, process.env.SECRET_KEY)
+        next()
+
+    } catch (e) {
+        res.status(401).send({message: "Cant auth, please login"})
+    }
+}
+
+server.get("/loggedin", checkAuth, (req, res) => {
+    res.send({})
+})
+
+server.get("/", checkAuth, async (req, res) => {
+    const id = JSON.parse(req.cookies.user).id
+    try {
         const {rows} = await turso.execute(
-            "SELECT * FROM tracker"
+            `SELECT * FROM tracker WHERE user = '${id}'`
         );
         res.send({data: rows})
     } catch (e) {
-        res.status(401).send({message: e.message})
+        res.status(403).send({message: e.message})
     }
 })
 
-server.post("/create", async (req, res) => {
+server.post("/create", checkAuth, async (req, res) => {
     const data = req.body
+    const user = JSON.parse(req.cookies.user).id
     //___________________ Sanitize data
     try {
         const query = await turso.execute(
-            `INSERT INTO tracker (task, start_time) VALUES ('${data.task}', '${data.start_time}');`
+            `INSERT INTO tracker (task, start_time, user) VALUES ('${data.task}', '${data.start_time}', '${user}');`
         );
         if (query.rowsAffected == 1) {
             res.status(200).send({message: "Task created Succesfully!", id: Number(query.lastInsertRowid)})
@@ -56,27 +64,26 @@ server.post("/create", async (req, res) => {
         }
 
     } catch (e) {
-        res.status(401).send({message: e.message})
+        res.status(403).send({message: e.message})
     }
 })
 
-server.put("/stop", async (req, res) => {
+server.put("/stop", checkAuth, async (req, res) => {
     const data = req.body
     //___________________ Sanitize data
     try {
         const query = await turso.execute(`UPDATE tracker SET end_time='${data.end_time}' WHERE id='${data.id}';`)
-        console.log(query)
         if (query.rowsAffected == 1) {
             res.status(200).send({message: "Task saved Succesfully!", id: Number(query.lastInsertRowid)})
         } else {
             throw new Error("Failed to save a task!")
         }
     } catch (e) {
-        res.status(401).send({message: e.message})
+        res.status(403).send({message: e.message})
     }
 })
 
-server.delete("/delete", async (req, res) => {
+server.delete("/delete", checkAuth, async (req, res) => {
     const data = req.body
 
     try {
@@ -88,7 +95,7 @@ server.delete("/delete", async (req, res) => {
         }
 
     } catch (e) {
-        res.status(401).send({message: e.message})
+        res.status(403).send({message: e.message})
     }
 })
 
@@ -96,12 +103,12 @@ server.post("/register", async (req, res) => {
     const data = req.body
 
     if (!emailExist(data.email)) {
-        res.status(401).send({message: "You Already have an account please login!"})
+        res.status(403).send({message: "You Already have an account please login!"})
     }
 
     const hashed_pass = await hashPassword(data.password)
     if (!hashed_pass) {
-        res.status(401).send({message: "Failed to hash password"})
+        res.status(403).send({message: "Failed to hash password"})
     }
 
     try {
@@ -109,18 +116,26 @@ server.post("/register", async (req, res) => {
 
         if (query.rowsAffected == 1) {
             const token = generateToken({id: Number(query.lastInsertRowid), email: data.email})
-            res.cookie('token', token, {
+
+            const option = {
                 httpOnly: true,
                 secure: false /*process.env.NODE_ENV === 'production'*/, // Use secure in production
                 maxAge: 3600000, // 1 hour
                 sameSite: 'strict'
-            }).send({message: "User is deep Inside"});
+            }
+
+            const user = {id: Number(query.lastInsertRowid), email: data.email}
+
+            res.cookie('token', token, option)
+            res.cookie('user', JSON.stringify(user), option)
+
+            res.send({message: "User is deep Inside"});
 
         } else {
             throw new Error("Failed to insert user")
         }
     } catch (e) {
-        res.status(401).send({message: e.message})
+        res.status(403).send({message: e.message})
     }
 })
 
@@ -128,7 +143,7 @@ server.post("/login", async (req, res) => {
     const data = req.body
 
     if (!emailExist(data.email)) {
-        res.status(401).send({message: "You dont have an account please register!"})
+        res.status(403).send({message: "You dont have an account please register!"})
     }
 
     try {
@@ -142,19 +157,27 @@ server.post("/login", async (req, res) => {
         }
 
         const token = generateToken({id: db_data.id, email: db_data.email})
-        res.cookie('token', token, {
+
+
+        const option = {
             httpOnly: true,
             secure: false /*process.env.NODE_ENV === 'production'*/, // Use secure in production
             maxAge: 3600000, // 1 hour
             sameSite: 'strict'
-        }).send({message: "User is deep Inside"});
+        }
 
+        const user = {id: db_data.id, email: db_data.email}
+
+        res.cookie('token', token, option)
+        res.cookie('user', JSON.stringify(user), option)
+
+        res.send({message: "User is deep Inside"});
     } catch (e) {
-        res.status(401).send({message: e.message})
+        res.status(403).send({message: e.message})
     }
 })
 
-server.get('/logout', (req, res) => {
+server.get('/logout', checkAuth, (req, res) => {
     res.clearCookie("token").send({message: "Logged out"})
 })
 
