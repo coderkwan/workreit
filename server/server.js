@@ -141,6 +141,7 @@ server.post("/register", async (req, res) => {
 
 server.post("/login", async (req, res) => {
     const data = req.body
+    console.log("hello", data)
 
     if (!emailExist(data.email)) {
         res.status(403).send({message: "You dont have an account please register!"})
@@ -148,6 +149,10 @@ server.post("/login", async (req, res) => {
 
     try {
         const query = await turso.execute(`SELECT * FROM users WHERE email='${data.email}';`)
+
+        if (!query.rows.length) {
+            throw new Error("User does not exist, please register!")
+        }
 
         const db_data = query.rows[0]
         const hashed_pass = await unhashPassword(data.password, db_data.password)
